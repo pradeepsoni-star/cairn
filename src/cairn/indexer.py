@@ -162,7 +162,16 @@ def reindex(
         progress.updated += 1 if previous else 0
         progress.added += 0 if previous else 1
 
-        if settings.scan_documents_for_commitments and extract.kind_of(path) in PROSE_KINDS:
+        # Respect the feature, not just the setting. Someone who asked only
+        # for search should not quietly acquire a to-do list they never wanted
+        # - a product that gives you things you did not choose is the thing
+        # the consent layer exists to prevent.
+        scan_for_promises = (
+            settings.scan_documents_for_commitments
+            and settings.has("commitments")
+            and extract.kind_of(path) in PROSE_KINDS
+        )
+        if scan_for_promises:
             found = commitments.find(
                 text[:200_000], "document", key, limit=MAX_COMMITMENTS_PER_FILE
             )

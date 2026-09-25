@@ -84,6 +84,12 @@ cairn
 ## The terminal, if you prefer it
 
 ```bash
+cairn setup --preset find         # see what a preset would do (changes nothing)
+cairn setup --preset find --yes   # apply it
+cairn permissions                 # what Cairn may do
+cairn permissions --allow read_folders
+cairn permissions --revoke read_folders
+
 cairn folders --add ~/Documents   # choose what it reads
 cairn index                       # read them (incremental after the first run)
 cairn search shipping terms       # search inside everything
@@ -181,7 +187,7 @@ pytest          # runs against a throwaway index, never yours
 ruff check .
 ```
 
-154 tests. The ones in `test_permissions.py` and `test_connectors.py` are written from the position of someone who does not believe this README — they start from a fresh install and try to make Cairn read, open or send something without being told to.
+159 tests. The ones in `test_permissions.py` and `test_connectors.py` are written from the position of someone who does not believe this README — they start from a fresh install and try to make Cairn read, open or send something without being told to.
 
 ## Contributing
 

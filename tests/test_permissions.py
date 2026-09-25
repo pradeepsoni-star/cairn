@@ -230,3 +230,16 @@ def test_before_setup_only_the_harmless_features_work():
     settings = Settings()
     assert settings.has("notes") and settings.has("brief")
     assert not settings.has("search") and not settings.has("ask")
+
+
+def test_asking_only_for_search_does_not_hand_you_a_to_do_list(conn, docs, granted):
+    """A product that gives you things you did not choose is the thing this
+    whole layer exists to prevent."""
+    from cairn import indexer
+
+    settings = Settings(folders=[str(docs)], features=["search"], setup_complete=True)
+    result = indexer.reindex(conn, settings)
+
+    assert result.added > 0, "search itself must still work"
+    assert result.commitments == 0
+    assert conn.execute("SELECT COUNT(*) AS n FROM commitments").fetchone()["n"] == 0

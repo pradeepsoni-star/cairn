@@ -142,3 +142,46 @@ def test_saving_the_same_note_twice_does_not_double_the_commitments(api_client):
     assert second["id"] == first["id"]
     assert len(api_client.get("/api/notes").json()["items"]) == 1
     assert len(api_client.get("/api/commitments").json()["items"]) == 1
+
+
+def test_the_cli_can_grant_and_revoke_without_the_browser(isolated_home, capsys):
+    """The terminal-first user must not be locked out by the consent layer."""
+    from cairn.cli import main
+    from cairn.permissions import Permission, Permissions
+
+    assert main(["permissions", "--allow", "read_folders"]) == 0
+    assert Permissions.load().allowed(Permission.READ_FOLDERS)
+
+    assert main(["permissions", "--revoke", "read_folders"]) == 0
+    assert not Permissions.load().allowed(Permission.READ_FOLDERS)
+
+
+def test_the_cli_will_not_grant_sending_mail_casually(isolated_home):
+    from cairn.cli import main
+    from cairn.permissions import Permission, Permissions
+
+    assert main(["permissions", "--allow", "gmail_send"]) == 1
+    assert not Permissions.load().allowed(Permission.GMAIL_SEND)
+
+    assert main(["permissions", "--allow", "gmail_send", "--i-understand"]) == 0
+    assert Permissions.load().allowed(Permission.GMAIL_SEND)
+
+
+def test_a_cli_preset_changes_nothing_until_confirmed(isolated_home):
+    from cairn.cli import main
+    from cairn.config import Settings
+    from cairn.permissions import Permission, Permissions
+
+    assert main(["setup", "--preset", "find"]) == 0
+    assert Settings.load().setup_complete is False
+    assert not Permissions.load().allowed(Permission.READ_FOLDERS)
+
+    assert main(["setup", "--preset", "find", "--yes"]) == 0
+    assert Settings.load().features == ["search"]
+    assert Permissions.load().allowed(Permission.READ_FOLDERS)
+
+
+def test_an_unknown_permission_name_is_rejected(isolated_home):
+    from cairn.cli import main
+
+    assert main(["permissions", "--allow", "read_everything"]) == 1

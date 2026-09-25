@@ -166,6 +166,111 @@ def cmd_ask(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_permissions(args: argparse.Namespace) -> int:
+    """Grant, revoke or review capabilities from a terminal.
+
+    Without this the whole permission layer is only reachable from the web
+    interface, which would make the CLI useless the moment consent became
+    mandatory - exactly the user who prefers a terminal is the one who would
+    hit that wall.
+    """
+    from cairn.permissions import CAPABILITIES, NEVER_PRESELECTED, Permission, Permissions
+
+    permissions = Permissions.load()
+
+    def resolve(name: str) -> Permission | None:
+        try:
+            return Permission(name.strip().lower().replace("-", "_"))
+        except ValueError:
+            _out(f"No such permission: {name}")
+            _out("Known: " + ", ".join(p.value for p in Permission))
+            return None
+
+    for name in args.allow or []:
+        permission = resolve(name)
+        if permission is None:
+            return 1
+        if permission in NEVER_PRESELECTED and not args.i_understand:
+            capability = CAPABILITIES[permission]
+            _out(f"{capability.title} reaches other people and cannot be undone.")
+            _out(f"  {capability.does_not}")
+            _out("Re-run with --i-understand if you are sure.")
+            return 1
+        permissions.decide(permission, True)
+        _out(f"Allowed: {CAPABILITIES[permission].title}")
+
+    for name in args.revoke or []:
+        permission = resolve(name)
+        if permission is None:
+            return 1
+        permissions.decide(permission, False)
+        _out(f"Revoked: {CAPABILITIES[permission].title}")
+
+    if args.allow or args.revoke:
+        return 0
+
+    _out("What Cairn may do:")
+    _out()
+    for row in permissions.as_list():
+        mark = {"allowed": "[x]", "refused": "[ ]", "not asked": "[?]"}[row["state"]]
+        _out(f" {mark} {row['key']:<16} {row['title']}")
+        _out(f"       {row['allows']}")
+        if row["leaves_machine"]:
+            _out("       NOTE: this one leaves your machine.")
+        _out()
+    _out('Grant with:  cairn permissions --allow read_folders')
+    _out('Revoke with: cairn permissions --revoke read_folders')
+    return 0
+
+
+def cmd_setup(args: argparse.Namespace) -> int:
+    """Choose a preset, or list them."""
+    from cairn.features import BY_KEY, BY_PRESET, PRESETS
+    from cairn.permissions import CAPABILITIES, Permissions
+
+    settings = Settings.load()
+    if not args.preset:
+        _out("Pick what this is for:")
+        _out()
+        for preset in PRESETS:
+            _out(f"  {preset.key:<12} {preset.title}")
+            _out(f"               {preset.who}")
+            _out()
+        _out("Then run:  cairn setup --preset work")
+        _out("A preset proposes; nothing is granted until you confirm it below.")
+        return 0
+
+    preset = BY_PRESET.get(args.preset)
+    if preset is None:
+        _out(f"No such preset: {args.preset}")
+        return 1
+
+    _out(f"{preset.title}")
+    _out()
+    _out("Features:")
+    for key in preset.features:
+        _out(f"  - {BY_KEY[key].title}")
+    _out()
+    _out("Permissions it proposes:")
+    for permission in preset.proposes:
+        _out(f"  - {CAPABILITIES[permission].title}")
+    _out()
+
+    if not args.yes:
+        _out("Nothing has been changed. Re-run with --yes to apply this.")
+        return 0
+
+    permissions = Permissions.load()
+    for permission in preset.proposes:
+        permissions.decide(permission, True)
+    settings.features = list(preset.features)
+    settings.preset = preset.key
+    settings.setup_complete = True
+    settings.save()
+    _out("Done. Nothing has been read yet - run `cairn index` when you are ready.")
+    return 0
+
+
 def cmd_folders(args: argparse.Namespace) -> int:
     settings = Settings.load()
     if args.add:
@@ -272,6 +377,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--add", metavar="PATH")
     p.add_argument("--remove", metavar="PATH")
     p.set_defaults(func=cmd_folders)
+
+    p = subparsers.add_parser("permissions", help="what Cairn may do, and change it")
+    p.add_argument("--allow", nargs="+", metavar="NAME")
+    p.add_argument("--revoke", nargs="+", metavar="NAME")
+    p.add_argument("--i-understand", action="store_true",
+                   help="required for permissions that reach other people")
+    p.set_defaults(func=cmd_permissions)
+
+    p = subparsers.add_parser("setup", help="choose what Cairn is for")
+    p.add_argument("--preset", metavar="NAME")
+    p.add_argument("--yes", action="store_true", help="apply it")
+    p.set_defaults(func=cmd_setup)
 
     p = subparsers.add_parser("stats", help="what is in the index")
     p.set_defaults(func=cmd_stats)
