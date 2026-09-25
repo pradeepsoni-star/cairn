@@ -100,6 +100,11 @@ button, input, textarea, select { font: inherit; color: inherit; }
 
 .brand svg { flex: 0 0 auto; }
 
+/* The buttons are rendered into this container from the user's chosen
+   features, so the layout rules belong here rather than on .side - the
+   sidebar's own children are the brand, this, and the footer. */
+#nav { display: flex; flex-direction: column; gap: 4px; }
+
 .nav {
   display: flex;
   align-items: center;
@@ -321,7 +326,10 @@ textarea:focus, input.text:focus { border-color: var(--accent); }
   }
   .brand { display: none; }
   .side-foot { display: none; }
-  .nav { width: auto; white-space: nowrap; }
+  /* A phone gets one scrollable strip of tabs, not a full screen of them
+     before any content appears. */
+  #nav { flex-direction: row; overflow-x: auto; gap: 2px; width: 100%; }
+  .nav { width: auto; white-space: nowrap; flex: 0 0 auto; }
   .main { padding: 20px 16px 48px; }
 }
 
