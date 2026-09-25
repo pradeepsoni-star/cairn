@@ -32,9 +32,10 @@ from pathlib import Path
 from fastapi import Body, FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
-from cairn import ai, brief, commitments, indexer, notes, search
+from cairn import ai, brief, commitments, features, indexer, notes, search
 from cairn.config import Settings, data_dir, default_watch_folders
 from cairn.db import connect, stats
+from cairn.permissions import Denied, Permission, Permissions, recent_activity, record
 
 WEB_DIR = Path(__file__).parent / "web"
 TOKEN = secrets.token_urlsafe(24)
@@ -59,6 +60,30 @@ def guard(token: str | None) -> None:
         raise HTTPException(status_code=403, detail="Bad or missing token.")
 
 
+def allow(permission: Permission) -> None:
+    """Refuse the request unless the user has granted this capability.
+
+    Deliberately a 403 with the plain-English reason attached, so the page can
+    say what to switch on rather than showing "something went wrong".
+    """
+    try:
+        Permissions.load().require(permission)
+    except Denied as denied:
+        raise HTTPException(status_code=403, detail=str(denied)) from denied
+
+
+def feature_on(key: str) -> None:
+    """Refuse the request if the feature is switched off.
+
+    A feature that is off has no working endpoint. Hiding only the button
+    would leave the capability reachable by anything that knows the URL.
+    """
+    if not Settings.load().has(key):
+        raise HTTPException(
+            status_code=404, detail=f"The {key} feature is switched off."
+        )
+
+
 # ----------------------------------------------------------------- the page
 
 
@@ -81,9 +106,25 @@ def style() -> FileResponse:
 # ------------------------------------------------------------------- state
 
 
+def connector_summary() -> list[dict]:
+    """Never let a broken connector take the whole state endpoint down with it.
+
+    The state call is what the interface needs to render anything at all, so a
+    missing optional package or an unreadable token file must degrade to "not
+    connected", not to a blank screen.
+    """
+    try:
+        from cairn.connectors import describe as describe_connectors
+
+        return describe_connectors()
+    except Exception:
+        return []
+
+
 @app.get("/api/state")
 def state() -> dict:
     settings = Settings.load()
+    permissions = Permissions.load()
     with _lock:
         return {
             "stats": stats(db()),
@@ -92,6 +133,14 @@ def state() -> dict:
             "progress": _index_state["progress"],
             "ai_available": ai.available(),
             "data_dir": str(data_dir()),
+            "features": features.describe(settings.features, permissions),
+            "permissions": permissions.as_list(),
+            "presets": features.presets(),
+            # What the setup screen starts with ticked. Distinct from what is
+            # enabled, which on a fresh install is deliberately nothing.
+            "default_features": features.default_enabled(),
+            "connectors": connector_summary(),
+            "setup_complete": settings.setup_complete,
             "suggested_folders": [
                 folder for folder in default_watch_folders() if folder not in settings.folders
             ],
@@ -136,11 +185,99 @@ def folder_suggestions(path: str = Query("")) -> dict:
     }
 
 
+# ------------------------------------------------- permissions and features
+
+
+@app.post("/api/permissions")
+def set_permission(payload: dict = Body(...), x_cairn_token: str | None = Header(None)) -> dict:
+    """Grant or revoke one capability. Revoking takes effect immediately."""
+    guard(x_cairn_token)
+    try:
+        permission = Permission(str(payload.get("key", "")))
+    except ValueError as exc:
+        raise HTTPException(400, "No such permission.") from exc
+    granted = bool(payload.get("granted"))
+    permissions = Permissions.load()
+    permissions.decide(permission, granted)
+    return {"ok": True, "permissions": permissions.as_list()}
+
+
+@app.post("/api/features")
+def set_features(payload: dict = Body(...), x_cairn_token: str | None = Header(None)) -> dict:
+    """Switch features on or off, and mark setup as done."""
+    guard(x_cairn_token)
+    settings = Settings.load()
+    wanted = payload.get("features")
+    if isinstance(wanted, list):
+        settings.features = [key for key in wanted if key in features.BY_KEY]
+    if "preset" in payload:
+        settings.preset = str(payload.get("preset") or "")
+    if payload.get("complete"):
+        settings.setup_complete = True
+        record("setup", "completed", ", ".join(settings.features))
+    settings.save()
+    return {"ok": True, "features": features.describe(settings.features, Permissions.load())}
+
+
+@app.get("/api/connectors")
+def list_connectors() -> dict:
+    from cairn.connectors import describe as describe_connectors
+
+    return {"connectors": describe_connectors()}
+
+
+@app.post("/api/connectors/{key}/{action}")
+def change_connector(
+    key: str, action: str, x_cairn_token: str | None = Header(None)
+) -> dict:
+    """Link or unlink a connected service.
+
+    Sign-in asks the service for exactly the permissions already granted here,
+    so this endpoint cannot widen access on its own - it can only act on a
+    decision the user already made on the permissions screen.
+    """
+    guard(x_cairn_token)
+    from cairn.connectors import NotConnected
+    from cairn.connectors import google as google_connector
+
+    if key != "google":
+        raise HTTPException(404, "No such connector.")
+    try:
+        if action == "connect":
+            return {"ok": True, "status": google_connector.connect()}
+        if action == "disconnect":
+            google_connector.disconnect()
+            return {"ok": True, "status": google_connector.status()}
+        if action == "forget":
+            with _lock:
+                removed = google_connector.forget_indexed_mail(db())
+            return {"ok": True, "removed": removed}
+        if action == "sync":
+            allow(Permission.GMAIL_READ)
+            feature_on("email")
+            from cairn.connectors.mail_index import sync
+
+            with _lock:
+                return {"ok": True, **sync(db())}
+    except NotConnected as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Denied as denied:
+        raise HTTPException(403, str(denied)) from denied
+    raise HTTPException(400, "Unknown action.")
+
+
+@app.get("/api/activity")
+def activity() -> dict:
+    """What Cairn has actually done, not what it promises it would do."""
+    return {"events": recent_activity(), "path": str(data_dir() / "activity.log")}
+
+
 # ------------------------------------------------------------------ search
 
 
 @app.get("/api/search")
 def do_search(q: str = Query(""), kind: str = Query(""), limit: int = Query(30)) -> dict:
+    feature_on("search")
     with _lock:
         hits = search.search(db(), q, limit=limit, kind=kind)
     return {"query": q, "count": len(hits), "hits": [h.__dict__ for h in hits]}
@@ -156,6 +293,7 @@ def passages(path: str = Query(...), q: str = Query("")) -> dict:
 def open_path(payload: dict = Body(...), x_cairn_token: str | None = Header(None)) -> dict:
     """Open a file, or reveal its folder, using the system's own handler."""
     guard(x_cairn_token)
+    allow(Permission.OPEN_FILES)
     target = str(payload.get("path", ""))
     reveal = bool(payload.get("reveal"))
     if target.startswith("note:"):
@@ -182,6 +320,7 @@ def open_path(payload: dict = Body(...), x_cairn_token: str | None = Header(None
             subprocess.Popen(["xdg-open", str(path.parent if reveal else path)])
     except OSError as exc:
         raise HTTPException(500, f"Could not open it: {exc}") from exc
+    record(Permission.OPEN_FILES, "revealed" if reveal else "opened", target)
     return {"ok": True}
 
 
@@ -199,6 +338,7 @@ def get_brief() -> dict:
 
 @app.get("/api/commitments")
 def list_commitments(who: str = Query("")) -> dict:
+    feature_on("commitments")
     with _lock:
         return {"items": commitments.open_items(db(), who=who)}
 
@@ -247,6 +387,7 @@ def change_commitment(
 
 @app.get("/api/notes")
 def list_notes() -> dict:
+    feature_on("notes")
     with _lock:
         return {"items": notes.recent(db())}
 
@@ -254,6 +395,7 @@ def list_notes() -> dict:
 @app.post("/api/notes")
 def add_note(payload: dict = Body(...), x_cairn_token: str | None = Header(None)) -> dict:
     guard(x_cairn_token)
+    feature_on("notes")
     body = str(payload.get("body", "")).strip()
     if not body:
         raise HTTPException(400, "Nothing to save.")
@@ -296,6 +438,7 @@ def _run_index(full: bool) -> None:
 @app.post("/api/index/start")
 def start_index(payload: dict = Body(default={}), x_cairn_token: str | None = Header(None)) -> dict:
     guard(x_cairn_token)
+    allow(Permission.READ_FOLDERS)
     if _index_state["running"]:
         return {"ok": False, "reason": "already running"}
     _index_state.update({"running": True, "stop": False, "progress": None})
@@ -323,6 +466,8 @@ def index_status() -> dict:
 @app.post("/api/ask")
 def ask(payload: dict = Body(...), x_cairn_token: str | None = Header(None)) -> JSONResponse:
     guard(x_cairn_token)
+    feature_on("ask")
+    allow(Permission.SEND_TO_AI)
     question = str(payload.get("question", "")).strip()
     if not question:
         raise HTTPException(400, "Ask something.")

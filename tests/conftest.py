@@ -60,23 +60,74 @@ def docs(tmp_path):
 
 
 @pytest.fixture
-def settings_for(docs):
-    from cairn.config import Settings
+def granted():
+    """Grant every capability.
 
-    settings = Settings(folders=[str(docs)])
+    Tests that are about indexing or searching should not also be re-testing
+    the permission gate, so they ask for this explicitly. The gate itself is
+    tested from a clean slate in test_permissions.py - and the fact that
+    every one of these tests failed the moment the gate was added is the
+    evidence that it is actually in the path.
+    """
+    from cairn.permissions import Permission, Permissions
+
+    permissions = Permissions.load()
+    for permission in Permission:
+        permissions.decide(permission, True)
+    return permissions
+
+
+@pytest.fixture
+def settings_for(docs, granted):
+    from cairn.config import Settings
+    from cairn.features import default_enabled
+
+    settings = Settings(folders=[str(docs)], features=default_enabled() + ["ask"])
+    settings.setup_complete = True
     settings.save()
     return settings
 
 
 @pytest.fixture
-def api_client(isolated_home, monkeypatch):
-    """A TestClient over the real app, with its own database."""
+def api_client(isolated_home, granted, monkeypatch):
+    """A TestClient over the real app, fully set up and fully permitted.
+
+    For the opposite - a fresh install that has been granted nothing - use
+    `bare_client`.
+    """
+    from fastapi.testclient import TestClient
+
+    from cairn import server
+    from cairn.config import Settings
+    from cairn.db import connect
+    from cairn.features import BY_KEY
+
+    settings = Settings.load()
+    settings.features = list(BY_KEY)
+    settings.setup_complete = True
+    settings.save()
+
+    connection = connect(Path(os.environ["CAIRN_HOME"]) / "api.db")
+    monkeypatch.setattr(server, "_conn", connection)
+    client = TestClient(server.app)
+    client.headers.update({"X-Cairn-Token": server.TOKEN})
+    yield client
+    connection.close()
+
+
+@pytest.fixture
+def bare_client(isolated_home, monkeypatch):
+    """A TestClient over a FRESH install: nothing granted, setup not done.
+
+    This is what a stranger downloading Cairn actually gets, and it is the
+    state most worth testing.
+    """
     from fastapi.testclient import TestClient
 
     from cairn import server
     from cairn.db import connect
 
-    connection = connect(Path(os.environ["CAIRN_HOME"]) / "api.db")
+    connection = connect(Path(os.environ["CAIRN_HOME"]) / "bare.db")
     monkeypatch.setattr(server, "_conn", connection)
     client = TestClient(server.app)
     client.headers.update({"X-Cairn-Token": server.TOKEN})

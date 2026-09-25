@@ -70,7 +70,7 @@ def test_a_cancelled_sweep_never_prunes(conn, docs, settings_for):
     assert after == before
 
 
-def test_a_folder_that_has_gone_away_does_not_empty_the_index(conn, docs, tmp_path):
+def test_a_folder_that_has_gone_away_does_not_empty_the_index(conn, docs, tmp_path, granted):
     """An unplugged external drive must cost you that drive's rows, not all of them."""
     other = tmp_path / "usb"
     other.mkdir()

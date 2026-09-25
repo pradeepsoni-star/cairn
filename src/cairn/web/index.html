@@ -22,12 +22,9 @@
       Cairn
     </div>
 
-    <button class="nav on" data-view="today">Today <span class="count" id="c-today"></span></button>
-    <button class="nav" data-view="search">Search</button>
-    <button class="nav" data-view="todo">Commitments <span class="count" id="c-todo"></span></button>
-    <button class="nav" data-view="notes">Notes <span class="count" id="c-notes"></span></button>
-    <button class="nav" data-view="ask">Ask</button>
-    <button class="nav" data-view="setup">Folders <span class="count" id="c-files"></span></button>
+    <!-- Built from the features the user actually switched on: a feature that
+         is off has no button here and no working endpoint behind it. -->
+    <div id="nav"></div>
 
     <div class="side-foot">
       <div id="foot-status">not indexed yet</div>

@@ -79,7 +79,12 @@ class Settings:
     # Extra folder names to skip, on top of the built-in noise list.
     exclude: list[str] = field(default_factory=list)
     # Cloud answering is off until the user turns it on AND has a key.
-    ai_enabled: bool = False
+    # Which features the user switched on, and whether they have been through
+    # setup at all. An empty list is meaningful - it is not "all of them".
+    features: list[str] = field(default_factory=list)
+    setup_complete: bool = False
+    preset: str = ""
+
     ai_provider: str = "auto"
     ai_model: str = ""
     # Commitment scanning over indexed documents, not just notes.
@@ -109,3 +114,17 @@ class Settings:
 
     def folder_paths(self) -> list[Path]:
         return [Path(f).expanduser() for f in self.folders if Path(f).expanduser().is_dir()]
+
+    def has(self, feature: str) -> bool:
+        """Whether a feature is switched on.
+
+        Before setup has been done, the features that need no permission are
+        available so the app is not a dead screen - but anything that reads
+        the disk or uses the network stays off until it is chosen.
+        """
+        if self.setup_complete:
+            return feature in self.features
+        from cairn.features import BY_KEY
+
+        spec = BY_KEY.get(feature)
+        return bool(spec and spec.default_on and not spec.requires)

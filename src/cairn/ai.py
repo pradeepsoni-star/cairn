@@ -171,7 +171,12 @@ def ask(conn, question: str, preferred: str = "auto", model: str = "") -> dict:
     """Answer a question from the user's own indexed documents."""
     from pathlib import Path
 
+    from cairn.permissions import Permission, Permissions, record
     from cairn.search import context_for_question
+
+    # Before anything is retrieved, let alone sent. A refused permission here
+    # must not even reveal which of the user's files matched.
+    Permissions.load().require(Permission.SEND_TO_AI)
 
     passages = context_for_question(conn, question)
     if not passages:
@@ -185,6 +190,14 @@ def ask(conn, question: str, preferred: str = "auto", model: str = "") -> dict:
     provider = resolve(preferred, model)
     context = "\n\n".join(
         f"--- {Path(p['path']).name} ---\n{p['body']}" for p in passages
+    )
+    # Written down before the request goes out, so the log is honest even if
+    # the call then fails or the machine loses power mid-request.
+    record(
+        Permission.SEND_TO_AI,
+        "sent",
+        f"{len(passages)} passage(s) from {len({p['path'] for p in passages})} file(s) "
+        f"to {provider.name} ({provider.model})",
     )
     answer = _call(provider, PROMPT.format(context=context, question=question))
 

@@ -22,6 +22,7 @@ from pathlib import Path
 from cairn import commitments, extract
 from cairn.config import Settings
 from cairn.db import set_meta
+from cairn.permissions import Permission, Permissions, record
 
 # Formats where a sentence is likely to be a sentence. Pulling commitments out
 # of a spreadsheet produces noise, so those are indexed for search but not
@@ -99,11 +100,25 @@ def reindex(
     """
     settings = settings or Settings.load()
     progress = Progress()
+
+    # Checked here, at the moment files are about to be opened, rather than
+    # when indexing was configured. Permission revoked a minute ago stops the
+    # sweep that starts now.
+    permissions = Permissions.load()
+    if not permissions.allowed(Permission.READ_FOLDERS):
+        progress.finished = True
+        progress.error = (
+            "Cairn has not been allowed to read your folders. Grant it under "
+            "Permissions and this will work."
+        )
+        return progress
+
     roots = settings.folder_paths()
     if not roots:
         progress.finished = True
         progress.error = "No folders chosen yet."
         return progress
+    record(Permission.READ_FOLDERS, "scan started", ", ".join(str(r) for r in roots))
 
     known = {
         row["path"]: (row["mtime"], row["size"])
@@ -174,6 +189,11 @@ def reindex(
             conn.execute("DELETE FROM files WHERE path = ?", (key,))
             progress.removed += 1
         set_meta(conn, "last_index", time.strftime("%Y-%m-%d %H:%M"))
+    record(
+        Permission.READ_FOLDERS,
+        "scan finished" if not stopped_early else "scan stopped",
+        f"{progress.scanned} files read, {progress.added + progress.updated} indexed",
+    )
 
     conn.commit()
     progress.finished = True
