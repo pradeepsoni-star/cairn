@@ -58,7 +58,7 @@ Each of these is a feature you switch on. A feature that is off has no button **
 ## Install
 
 **No Python, nothing to set up** — download the file for your system from the
-[latest release](https://github.com/pradeepsoni-hq/cairn/releases/latest) and run it:
+[latest release](https://github.com/pradeepsoni-star/cairn/releases/latest) and run it:
 
 | | |
 |---|---|
@@ -88,7 +88,7 @@ cairn
 ### From source
 
 ```bash
-git clone https://github.com/pradeepsoni-hq/cairn.git
+git clone https://github.com/pradeepsoni-star/cairn.git
 cd cairn
 pip install -e ".[docs,ai,google,dev]"
 pytest
