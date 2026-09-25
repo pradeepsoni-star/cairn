@@ -12,17 +12,36 @@ Local-first. Nothing is granted by default. Everything it does is written down.
 
 ---
 
-## The problem
+## Why you'd use this
 
-Two things cost every person who works on a computer real hours every week:
+Three moments. If none of them is familiar, this is not for you and that is a
+perfectly good outcome.
 
-**You cannot find your own work.** Windows Search and Spotlight index file *names* and give up on the inside of a PDF, a spreadsheet or a deck. You know the number is in "one of those files from March". You spend eleven minutes looking.
+**"It's in one of those files from March."** You know the figure exists. You
+know roughly when. You spend eleven minutes opening spreadsheets. Windows
+Search and Spotlight index file *names* and give up on the inside of a PDF, a
+spreadsheet or a deck — Cairn reads what is written inside them, and shows you
+the sentence.
 
-**You forget what you promised.** Not the things on your to-do list — the things you wrote in the middle of a meeting note, or sent in an email on Tuesday. *"I'll send the revised figures on Thursday."* Nobody puts that on a list. Everybody means to.
+**"I said I'd send it Thursday."** It is Monday. You wrote it in the middle of
+a meeting note and scrolled past. Nobody puts that on a to-do list and
+everybody means to. Cairn pulls those sentences out with the date already
+worked out, and tells you which are late.
 
-And one thing stops people installing the tools that would fix it: **they will not hand a program the keys to their documents and their mailbox on the strength of a paragraph in a README.**
+**"Whatever happened to that?"** Anita said she would confirm the container
+booking. Did she? Cairn keeps what other people owe *you* on its own list,
+pulled from the same sentences, so the things you are waiting on stop living
+only in your head.
 
-Cairn is built around that third problem.
+And one reason people give for *not* installing something like this:
+
+**"I am not letting a program read my clients' files."** Reasonable. Cairn is
+built so you do not have to take that on trust — see below.
+
+## The problem it does not solve
+
+It cannot read WhatsApp, and it does not listen to your phone calls. If your
+work lives there, it will help less than you want it to.
 
 ## Consent is the product
 

@@ -552,3 +552,12 @@ code { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: 
 :root[data-theme="hud"] .tag.warn { background: rgba(255, 176, 46, 0.14); color: var(--warn); }
 :root[data-theme="hud"] .brand { color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; }
 :root[data-theme="hud"] .bar > div { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+
+/* The "why" block on the first screen. Three claims, each with the concrete
+   moment underneath it - an argument people recognise beats one they have to
+   be persuaded of. */
+.why-row { padding: 11px 0; border-bottom: 1px solid var(--line); }
+.why-row:last-child { border-bottom: 0; }
+.why-row strong { display: block; margin-bottom: 3px; }
+.why-row span { color: var(--ink-2); font-size: 14px; }
+.why-row em { font-style: normal; color: var(--ink); }

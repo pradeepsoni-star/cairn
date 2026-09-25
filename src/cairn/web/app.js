@@ -139,10 +139,36 @@ async function viewWelcome() {
       <span><strong>${esc(feature.title)}</strong><br><span class="muted">${esc(feature.pitch)}</span></span>
     </label>`).join("");
 
+  // Why before how. The first screen used to open with a consent explanation,
+  // which answers a question nobody has yet asked - someone who has just
+  // double-clicked an unfamiliar program wants to know what it is FOR, and
+  // only then what it wants from them. Both moments are concrete on purpose:
+  // "you cannot find your own work" is an argument, "the number is in one of
+  // those files from March" is a memory.
   $("main").innerHTML = `
     <h1>Welcome to Cairn</h1>
-    <p class="sub">Cairn does nothing until you say what it may do. Pick what you
-      want, allow only what that needs, and change your mind whenever you like.</p>
+    <p class="sub">Two things it fixes, and one promise about how.</p>
+
+    <div class="card why">
+      <div class="why-row">
+        <strong>You cannot find your own work.</strong>
+        <span>The figure is in one of those files from March. You know it exists.
+          Windows and Mac search only look at file <em>names</em> — Cairn reads
+          what is written <em>inside</em> your documents.</span>
+      </div>
+      <div class="why-row">
+        <strong>You forget what you promised.</strong>
+        <span>Not the things on a to-do list — the sentence in the middle of a
+          meeting note. <em>"I'll send the revised figures on Thursday."</em>
+          Cairn finds those and puts a date on them.</span>
+      </div>
+      <div class="why-row">
+        <strong>Nothing leaves this computer.</strong>
+        <span>It reads only the folders you name, never changes a file, and has
+          no account to sign up for. Anything that would touch the internet is a
+          separate permission you can refuse and still use everything else.</span>
+      </div>
+    </div>
 
     <h2>1 &middot; What is this for?</h2>
     <div class="presets">${presetCards}</div>
