@@ -10,6 +10,8 @@ Local-first. Nothing is granted by default. Everything it does is written down.
 
 </div>
 
+**[User guide](docs/GUIDE.md)** · **[Download](https://github.com/pradeepsoni-star/cairn/releases/latest)**
+
 ---
 
 ## Why you'd use this

@@ -20,7 +20,6 @@ ask, and only to the provider whose key you supplied.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 
 PROMPT = """You are answering a question using only the passages below, which come from the user's own files.
@@ -41,13 +40,20 @@ DEFAULT_MODELS = {
     "anthropic": "claude-sonnet-5",
     "openai": "gpt-4o-mini",
     "gemini": "gemini-2.0-flash",
-    "ollama": "llama3.1",
+    # 3B, about 2 GB. Deliberately not the 8B: most people running this have a
+    # laptop with 8 GB of RAM and no GPU, where the larger model swaps and
+    # answers in minutes. A small model that replies is worth more than a good
+    # one that appears broken.
+    "ollama": "llama3.2",
 }
 
+# Keys now come from cairn.modelkeys, which checks the environment first and
+# then what the user pasted into the app. Kept as a name because the error
+# messages quote the variable people are most likely to have heard of.
 _KEYS = {
-    "anthropic": ("ANTHROPIC_API_KEY", "CAIRN_ANTHROPIC_KEY"),
-    "openai": ("OPENAI_API_KEY", "CAIRN_OPENAI_KEY"),
-    "gemini": ("GEMINI_API_KEY", "GOOGLE_API_KEY", "CAIRN_GEMINI_KEY"),
+    "anthropic": ("ANTHROPIC_API_KEY",),
+    "openai": ("OPENAI_API_KEY",),
+    "gemini": ("GEMINI_API_KEY",),
 }
 
 
@@ -63,17 +69,17 @@ class Provider:
 
 
 def _key_for(provider: str) -> str:
-    for variable in _KEYS.get(provider, ()):
-        value = os.environ.get(variable, "").strip()
-        if value:
-            return value
-    return ""
+    from cairn.modelkeys import key_for
+
+    return key_for(provider)
 
 
 def available() -> list[str]:
     """Providers this machine could use right now."""
+    from cairn.modelkeys import ollama_enabled
+
     found = [name for name in _KEYS if _key_for(name)]
-    if os.environ.get("OLLAMA_HOST") or os.environ.get("CAIRN_OLLAMA", "").lower() == "on":
+    if ollama_enabled():
         found.append("ollama")
     return found
 
@@ -88,9 +94,11 @@ def resolve(preferred: str = "auto", model: str = "") -> Provider:
             )
         return Provider(preferred, key, model or DEFAULT_MODELS.get(preferred, ""))
 
+    from cairn.modelkeys import ollama_enabled
+
     for name in ("anthropic", "openai", "gemini", "ollama"):
         if name == "ollama":
-            if os.environ.get("OLLAMA_HOST") or os.environ.get("CAIRN_OLLAMA", "").lower() == "on":
+            if ollama_enabled():
                 return Provider(name, "", model or DEFAULT_MODELS[name])
             continue
         key = _key_for(name)
@@ -98,8 +106,8 @@ def resolve(preferred: str = "auto", model: str = "") -> Provider:
             return Provider(name, key, model or DEFAULT_MODELS[name])
 
     raise NotConfigured(
-        "Answering needs a model. Set one of ANTHROPIC_API_KEY, OPENAI_API_KEY or "
-        "GEMINI_API_KEY, or run Ollama locally and set OLLAMA_HOST. "
+        "Answering needs a model. Add one under Ask - Gemini has a free tier, or "
+        "Ollama runs on this machine for nothing and sends no data anywhere. "
         "Search, commitments, notes and the brief all work without this."
     )
 
@@ -157,7 +165,9 @@ def _call(provider: Provider, prompt: str, timeout: float = 60.0) -> str:
         parts = candidates[0].get("content", {}).get("parts", [])
         return "".join(p.get("text", "") for p in parts).strip()
 
-    host = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    from cairn.modelkeys import ollama_host
+
+    host = ollama_host().rstrip("/")
     response = httpx.post(
         f"{host}/api/generate",
         json={"model": provider.model, "prompt": prompt, "stream": False},

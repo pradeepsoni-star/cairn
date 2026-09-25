@@ -138,7 +138,7 @@ def test_granting_then_asking_gets_past_both_gates(bare_client, monkeypatch):
     response = bare_client.post("/api/ask", json={"question": "delivery terms"})
     # Past the gates; it now fails for the honest reason - no model configured.
     assert response.status_code == 200
-    assert "key" in response.json()["error"].lower()
+    assert "needs a model" in response.json()["error"].lower()
 
 
 def test_a_switched_off_feature_has_no_endpoint(bare_client):

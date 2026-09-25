@@ -102,7 +102,11 @@ def test_asking_without_a_configured_model_explains_itself(api_client, monkeypat
         monkeypatch.delenv(variable, raising=False)
     api_client.post("/api/notes", json={"body": "Delivery terms are DAP Rotterdam."})
     result = api_client.post("/api/ask", json={"question": "what are the delivery terms"}).json()
-    assert result["error"] and "key" in result["error"].lower()
+    # It must say what to DO, not name an environment variable. Someone who
+    # does not know what one is cannot act on "set ANTHROPIC_API_KEY".
+    assert result["error"]
+    assert "ask" in result["error"].lower()
+    assert "free" in result["error"].lower(), "it should point at the option that costs nothing"
 
 
 def test_asking_about_something_absent_says_so_without_calling_a_model(api_client):

@@ -312,7 +312,67 @@ async function viewPermissions() {
             <td class="muted">${esc(event.detail)}</td></tr>`).join("")}</table>`
         : `<div class="empty">Nothing yet.</div>`}
       <p class="muted" style="margin-top:12px">Full log: ${esc(activity.path)}</p>
+    </div>
+
+    <h2>Start over</h2>
+    <div class="card">
+      <p style="margin:0 0 4px"><strong>Choose everything again</strong></p>
+      <p class="muted" style="margin:0 0 10px">Runs setup from the beginning.
+        Your notes, commitments and everything Cairn has read are kept.</p>
+      <button class="btn" id="reset-setup">Run setup again</button>
+
+      <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)">
+        <p style="margin:0 0 4px"><strong>Erase everything</strong></p>
+        <p class="muted" style="margin:0 0 10px">Removes what Cairn has read, your
+          notes, your commitments, and every permission — as if it had just been
+          installed. A restorable copy is saved first, and this screen will tell
+          you where.</p>
+        <button class="btn" id="reset-all">Erase everything</button>
+      </div>
+
+      <p class="muted" style="margin:16px 0 0">Everything Cairn stores lives in
+        <code>${esc(state.data.data_dir || "")}</code></p>
+      <div id="backups"></div>
     </div>`;
+
+  $("reset-setup").onclick = async () => {
+    const result = await api("/api/reset", { method: "POST", body: JSON.stringify({}) });
+    toast(result.message);
+    state.draft = null;
+    await refreshCounts();
+    render();
+  };
+
+  $("reset-all").onclick = async () => {
+    // The same typed confirmation the irreversible permissions use. This one
+    // throws away work rather than reaching another person, but it is just as
+    // unrecoverable from the user's point of view.
+    const ok = await confirmDanger({
+      title: "Erase everything",
+      does_not: "This removes everything Cairn has read, your notes, your "
+        + "commitments and every permission. A restorable copy is saved first, "
+        + "and you will be told where it is.",
+    }, "erase");
+    if (!ok) return;
+    const result = await api("/api/reset", {
+      method: "POST",
+      body: JSON.stringify({ erase_everything: true, confirm: "erase" }),
+    });
+    toast(result.message);
+    state.draft = null;
+    state.query = "";
+    await refreshCounts();
+    render();
+    setTimeout(() => toast("Backup saved to " + result.backup), 2800);
+  };
+
+  api("/api/backups").then(({ backups }) => {
+    const box = $("backups");
+    if (!box || !backups.length) return;
+    box.innerHTML = `<p class="muted" style="margin:12px 0 4px">Previous backups:</p>`
+      + backups.slice(0, 5).map((b) =>
+          `<div class="muted" style="font-size:12.5px">${esc(b.when)} &middot; ${b.size_mb} MB &middot; ${esc(b.path)}</div>`).join("");
+  }).catch(() => {});
 
   $("main").querySelectorAll("[data-toggle]").forEach((button) => {
     button.onclick = async () => {
@@ -334,32 +394,108 @@ async function viewPermissions() {
   });
 }
 
-function confirmDanger(permission) {
-  // The artifact viewer refuses window.confirm, and a product should not
-  // depend on a browser dialog for its most serious decision anyway.
+function confirmDanger(subject, requiredWord = "allow") {
+  // Used for the two things that cannot be taken back: granting a permission
+  // that reaches another person, and erasing everything. Typing the word is
+  // not friction for its own sake - it is the difference between a decision
+  // and a misclick. A browser confirm() dialog would be neither.
   return new Promise((resolve) => {
     const shade = document.createElement("div");
     shade.className = "shade";
     shade.innerHTML = `<div class="dialog">
-      <h3>${esc(permission.title)}</h3>
-      <p>${esc(permission.does_not)}</p>
-      <p class="muted">Type <strong>allow</strong> to confirm.</p>
-      <input class="text" id="confirm-word" autocomplete="off">
+      <h3>${esc(subject.title)}</h3>
+      <p>${esc(subject.does_not)}</p>
+      <p class="muted">Type <strong>${esc(requiredWord)}</strong> to confirm.</p>
+      <input class="text" id="confirm-word" autocomplete="off" spellcheck="false">
       <div class="row" style="margin-top:14px;justify-content:flex-end">
         <button class="btn" id="confirm-no">Cancel</button>
-        <button class="btn primary" id="confirm-yes" disabled>Allow this</button>
+        <button class="btn primary" id="confirm-yes" disabled>
+          ${esc(requiredWord === "allow" ? "Allow this" : "Erase it")}</button>
       </div>
     </div>`;
     document.body.appendChild(shade);
-    const word = shade.querySelector("#confirm-word");
+
+    const box = shade.querySelector("#confirm-word");
     const yes = shade.querySelector("#confirm-yes");
-    word.focus();
-    word.oninput = () => { yes.disabled = word.value.trim().toLowerCase() !== "allow"; };
+    box.focus();
+    box.oninput = () => {
+      yes.disabled = box.value.trim().toLowerCase() !== requiredWord;
+    };
+    box.onkeydown = (e) => { if (e.key === "Enter" && !yes.disabled) close(true); };
+
     const close = (answer) => { shade.remove(); resolve(answer); };
     yes.onclick = () => close(true);
     shade.querySelector("#confirm-no").onclick = () => close(false);
     shade.onclick = (e) => { if (e.target === shade) close(false); };
   });
+}
+
+function providerRow(p) {
+  const badge = p.configured
+    ? `<span class="tag">${esc(p.source)}${p.tail ? " " + esc(p.tail) : ""}</span>`
+    : "";
+  const field = p.key === "ollama"
+    ? `<input class="text" data-ollama placeholder="http://localhost:11434" value="">`
+    : `<input class="text" type="password" data-key="${esc(p.key)}" autocomplete="off"
+         placeholder="${p.configured ? "A key is saved. Paste a new one to replace it." : "Paste your key"}">`;
+  return `<div class="perm">
+    <div class="perm-control" style="min-width:86px"><strong>${esc(p.key)}</strong></div>
+    <div class="perm-body">
+      <div class="muted" style="margin-bottom:6px">${esc(p.hint)} ${badge}</div>
+      <div class="row">
+        ${field}
+        <button class="btn sm" data-save="${esc(p.key)}">Save</button>
+        ${p.configured ? `<button class="btn sm" data-forget="${esc(p.key)}">Remove</button>` : ""}
+      </div>
+    </div>
+  </div>`;
+}
+
+function wireModelForm(model) {
+  const ollamaBox = $("main").querySelector("[data-ollama]");
+  if (ollamaBox) ollamaBox.value = model.ollama_host || "";
+
+  $("main").querySelectorAll("[data-save]").forEach((button) => {
+    button.onclick = async () => {
+      const provider = button.dataset.save;
+      const body = provider === "ollama"
+        ? { ollama_host: ollamaBox.value.trim() }
+        : { provider, key: $("main").querySelector(`[data-key="${provider}"]`).value };
+      button.disabled = true;
+      await api("/api/model", { method: "POST", body: JSON.stringify(body) });
+      toast("Saved. Checking it works...");
+      await testModel(provider);
+      await refreshCounts();
+      render();
+    };
+  });
+
+  $("main").querySelectorAll("[data-forget]").forEach((button) => {
+    button.onclick = async () => {
+      const provider = button.dataset.forget;
+      await api("/api/model", {
+        method: "POST",
+        body: JSON.stringify(provider === "ollama" ? { ollama_host: "" } : { provider, key: "" }),
+      });
+      toast("Removed");
+      await refreshCounts();
+      render();
+    };
+  });
+}
+
+async function testModel(provider) {
+  // Check it here, not the first time they actually need an answer. A key with
+  // a typo in it should fail on the screen where it was typed.
+  try {
+    const result = await api("/api/model/test", {
+      method: "POST",
+      body: JSON.stringify({ provider }),
+    });
+    toast(result.ok ? `Working — ${result.provider}` : `Saved, but it failed: ${result.error}`);
+  } catch (error) {
+    toast(`Saved, but the check failed: ${error.message}`);
+  }
 }
 
 /* ------------------------------------------------------------- connections */
@@ -603,9 +739,10 @@ async function viewNotes() {
   });
 }
 
-function viewAsk() {
+async function viewAsk() {
   const providers = state.data.ai_available || [];
   const allowed = permit("send_to_ai").granted;
+  const model = await api("/api/model");
   $("main").innerHTML = `
     <h1>Ask</h1>
     <p class="sub">A question answered from your own documents, with the files it came from named.</p>
@@ -613,16 +750,26 @@ function viewAsk() {
       <p class="muted" style="margin:6px 0 0">Asking sends your question and the
       matched paragraphs to an AI provider. Allow it under
       <a data-go="permissions">Permissions</a> if you want that.</p></div>`}
-    ${providers.length || !allowed ? "" : `<div class="card"><strong>No model configured.</strong>
-      <p class="muted" style="margin:6px 0 0">Set <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code> or
-      <code>GEMINI_API_KEY</code> in your environment and restart Cairn, or run Ollama locally and set
-      <code>OLLAMA_HOST</code>.</p></div>`}
+    ${providers.length || !allowed ? "" : `<div class="card"><strong>No model yet.</strong>
+      <p class="muted" style="margin:6px 0 0">Add one below. Two of them cost nothing.</p></div>`}
     <div class="searchbar">
       <input id="question" placeholder="What did we agree on the delivery terms?" ${allowed ? "" : "disabled"}>
       <button class="btn primary" id="ask-go" ${allowed ? "" : "disabled"}>Ask</button>
     </div>
-    <div id="answer"></div>`;
+    <div id="answer"></div>
 
+    <h2>Model</h2>
+    <p class="muted" style="margin:-4px 0 10px">Cairn needs one of these to answer
+      questions. Everything else works without it.</p>
+    <div class="card">
+      ${model.providers.map(providerRow).join("")}
+      <p class="muted" style="margin:14px 0 0">Keys are kept in
+        <code>${esc(model.stored_in)}</code> on this computer, readable only by
+        you. Cairn never shows a key back to you and never writes one to its
+        activity log. An environment variable, if you have one set, always wins.</p>
+    </div>`;
+
+  wireModelForm(model);
   if (!allowed) return;
   const go = async () => {
     const question = $("question").value.trim();

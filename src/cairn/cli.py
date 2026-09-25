@@ -305,6 +305,46 @@ def cmd_folders(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_reset(args: argparse.Namespace) -> int:
+    """Start over, from a terminal.
+
+    Prints what it is about to do and changes nothing without --yes, because
+    this is the one command here that can throw work away.
+    """
+    from cairn.db import session, stats
+    from cairn.reset import list_backups, start_over
+
+    if args.list_backups:
+        found = list_backups()
+        if not found:
+            _out("No backups yet. One is made automatically before any reset.")
+            return 0
+        _out("Backups, newest first:")
+        for entry in found:
+            _out(f"  {entry['when']}   {entry['size_mb']:>5} MB   {entry['path']}")
+        return 0
+
+    with session() as conn:
+        counts = stats(conn)
+        if not args.yes:
+            if args.all:
+                _out("This would REMOVE, after taking a backup:")
+                _out(f"  {counts['files']:,} indexed item(s)")
+                _out(f"  {counts['notes']:,} note(s)")
+                _out(f"  {counts['open_commitments']:,} open commitment(s)")
+                _out("  every permission and setting")
+            else:
+                _out("This would run setup again. Nothing you have would be removed.")
+            _out()
+            _out("Nothing has changed. Re-run with --yes to do it.")
+            return 0
+
+        result = start_over(conn, erase_everything=args.all)
+    _out(result["message"])
+    _out(f"Backup: {result['backup']}")
+    return 0
+
+
 def cmd_stats(args: argparse.Namespace) -> int:
     from cairn.db import session, stats
 
@@ -389,6 +429,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--preset", metavar="NAME")
     p.add_argument("--yes", action="store_true", help="apply it")
     p.set_defaults(func=cmd_setup)
+
+    p = subparsers.add_parser("reset", help="run setup again, or erase everything")
+    p.add_argument("--all", action="store_true",
+                   help="erase the index, notes, commitments, permissions and settings")
+    p.add_argument("--yes", action="store_true", help="actually do it")
+    p.add_argument("--list-backups", action="store_true")
+    p.set_defaults(func=cmd_reset)
 
     p = subparsers.add_parser("stats", help="what is in the index")
     p.set_defaults(func=cmd_stats)

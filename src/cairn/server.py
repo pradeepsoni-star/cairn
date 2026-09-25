@@ -230,6 +230,55 @@ def set_features(payload: dict = Body(...), x_cairn_token: str | None = Header(N
     return {"ok": True, "features": features.describe(settings.features, Permissions.load())}
 
 
+@app.get("/api/model")
+def model_settings() -> dict:
+    """What is configured. Never contains a key."""
+    from cairn.modelkeys import describe
+
+    return describe()
+
+
+@app.post("/api/model")
+def save_model(payload: dict = Body(...), x_cairn_token: str | None = Header(None)) -> dict:
+    """Save a key, an Ollama address, or which provider to prefer."""
+    guard(x_cairn_token)
+    from cairn.modelkeys import PROVIDERS, choose, describe, set_key, set_ollama_host
+
+    if "key" in payload:
+        provider = str(payload.get("provider", ""))
+        if provider not in PROVIDERS:
+            raise HTTPException(400, "Unknown provider.")
+        set_key(provider, str(payload.get("key", "")))
+        # Deliberately not logged with the key, and not logged at all beyond
+        # the fact a key changed - the activity log is a plain file the user
+        # is encouraged to read and might paste somewhere.
+        record("model", "key changed", provider)
+    if "ollama_host" in payload:
+        set_ollama_host(str(payload.get("ollama_host", "")))
+        record("model", "ollama address set", str(payload.get("ollama_host", "")))
+    if "choose" in payload:
+        choose(str(payload.get("choose", "auto")), str(payload.get("model", "")))
+    return describe()
+
+
+@app.post("/api/model/test")
+def test_model(payload: dict = Body(default={}), x_cairn_token: str | None = Header(None)) -> dict:
+    """Ask the provider one trivial question, so a wrong key is found here
+    rather than the first time the user actually needs an answer."""
+    guard(x_cairn_token)
+    allow(Permission.SEND_TO_AI)
+    from cairn import ai
+
+    try:
+        provider = ai.resolve(str(payload.get("provider", "auto")), str(payload.get("model", "")))
+        reply = ai._call(provider, "Reply with the single word: ready", timeout=30.0)
+    except ai.NotConfigured as exc:
+        return {"ok": False, "error": str(exc)}
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"[:300]}
+    return {"ok": True, "provider": f"{provider.name}/{provider.model}", "reply": reply[:120]}
+
+
 @app.get("/api/connectors")
 def list_connectors() -> dict:
     from cairn.connectors import describe as describe_connectors
@@ -275,6 +324,26 @@ def change_connector(
     except Denied as denied:
         raise HTTPException(403, str(denied)) from denied
     raise HTTPException(400, "Unknown action.")
+
+
+@app.post("/api/reset")
+def reset_cairn(payload: dict = Body(...), x_cairn_token: str | None = Header(None)) -> dict:
+    """Start over. Always backs up first; never removes without a copy."""
+    guard(x_cairn_token)
+    from cairn.reset import start_over
+
+    erase = bool(payload.get("erase_everything"))
+    if erase and str(payload.get("confirm", "")).strip().lower() != "erase":
+        raise HTTPException(400, "Erasing everything needs to be confirmed by typing 'erase'.")
+    with _lock:
+        return start_over(db(), erase_everything=erase)
+
+
+@app.get("/api/backups")
+def backups() -> dict:
+    from cairn.reset import list_backups
+
+    return {"backups": list_backups(), "data_dir": str(data_dir())}
 
 
 @app.get("/api/activity")
