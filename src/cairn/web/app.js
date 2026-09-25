@@ -871,18 +871,40 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-$("theme-toggle").onclick = () => {
-  const now = document.documentElement.getAttribute("data-theme");
-  const next = now === "dark" ? "light" : now === "light" ? "" : "dark";
-  if (next) document.documentElement.setAttribute("data-theme", next);
+// "" means follow the operating system, which is the default and the one most
+// people should never have to think about. The button names the theme it is
+// currently showing rather than the one it will switch to - a control labelled
+// with a state you cannot see is a guessing game.
+const THEMES = ["", "dark", "command", "light"];
+const THEME_LABEL = { "": "system", dark: "dark", command: "command", light: "light" };
+
+function applyTheme(value) {
+  const chosen = THEMES.includes(value) ? value : "";
+  // "command" is Sarathi's HUD. The attribute keeps the shorter name the CSS
+  // was written against.
+  if (chosen === "command") document.documentElement.setAttribute("data-theme", "hud");
+  else if (chosen) document.documentElement.setAttribute("data-theme", chosen);
   else document.documentElement.removeAttribute("data-theme");
-  try { localStorage.setItem("cairn-theme", next); } catch (e) { /* private window */ }
+
+  const button = $("theme-toggle");
+  if (button) button.textContent = THEME_LABEL[chosen];
+  try { localStorage.setItem("cairn-theme", chosen); } catch (e) { /* private window */ }
+}
+
+function currentTheme() {
+  const attribute = document.documentElement.getAttribute("data-theme") || "";
+  return attribute === "hud" ? "command" : attribute;
+}
+
+$("theme-toggle").onclick = () => {
+  applyTheme(THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length]);
 };
 
 try {
-  const saved = localStorage.getItem("cairn-theme");
-  if (saved) document.documentElement.setAttribute("data-theme", saved);
-} catch (e) { /* ignore */ }
+  applyTheme(localStorage.getItem("cairn-theme") || "");
+} catch (e) {
+  applyTheme("");
+}
 
 /* ------------------------------------------------------------------ shell */
 

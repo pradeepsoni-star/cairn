@@ -86,21 +86,32 @@ def feature_on(key: str) -> None:
 
 # ----------------------------------------------------------------- the page
 
+# The interface is served with caching switched off. These files change when
+# Cairn is updated, and a browser holding yesterday's app.js against today's
+# server produces a broken screen that no amount of restarting fixes - the
+# user has to know to hard-reload, which they do not. The files are a few
+# kilobytes from local disk; there is nothing to save here.
+_NO_CACHE = {"Cache-Control": "no-store, must-revalidate", "Pragma": "no-cache"}
+
 
 @app.get("/", response_class=HTMLResponse)
 def home() -> HTMLResponse:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
-    return HTMLResponse(html.replace("__CAIRN_TOKEN__", TOKEN))
+    # Never cached: it carries this run's token, and a stale one is a page
+    # whose every button silently 403s.
+    return HTMLResponse(html.replace("__CAIRN_TOKEN__", TOKEN), headers=_NO_CACHE)
 
 
 @app.get("/app.js")
 def script() -> FileResponse:
-    return FileResponse(WEB_DIR / "app.js", media_type="application/javascript")
+    return FileResponse(
+        WEB_DIR / "app.js", media_type="application/javascript", headers=_NO_CACHE
+    )
 
 
 @app.get("/style.css")
 def style() -> FileResponse:
-    return FileResponse(WEB_DIR / "style.css", media_type="text/css")
+    return FileResponse(WEB_DIR / "style.css", media_type="text/css", headers=_NO_CACHE)
 
 
 # ------------------------------------------------------------------- state

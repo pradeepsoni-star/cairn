@@ -387,3 +387,160 @@ textarea:focus, input.text:focus { border-color: var(--accent); }
 
 a[data-go] { color: var(--accent); cursor: pointer; text-decoration: underline; }
 code { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+
+/* ------------------------------------------------------- the command theme
+
+   Pradeep's own assistant, Sarathi, wears a JARVIS-style HUD: cyan on a
+   near-black blue, amber for anything urgent, and panels whose top-left and
+   bottom-right corners are chamfered. That look is his, and this is it
+   ported to the web - same palette, same silhouette.
+
+   It is a THEME, not a replacement. The plain light view stays the default,
+   because the permission screens are the product's trust argument and they
+   have to read as calm and legible to someone who is deciding whether to let
+   software read their client files. A sci-fi HUD is the right skin for a
+   personal command centre and the wrong first impression for a cautious
+   buyer - so both exist and the user picks.
+
+   The chamfer is drawn with two stacked pseudo-elements rather than a border,
+   because clip-path cuts the border off with the corner. ::before is the edge
+   colour at inset 0, ::after is the fill at inset 1px, and both sit at
+   z-index -1 so the panel's own content still paints above them. */
+
+:root[data-theme="hud"] {
+  color-scheme: dark;
+  --bg: #04121c;
+  --surface: #0a1e2b;
+  --surface-2: #0f2a3a;
+  --line: #1c4a63;
+  --ink: #cfeef9;
+  --ink-2: #9fd8e8;
+  --ink-3: #5f7d8c;
+  --accent: #00d4ff;
+  --accent-soft: rgba(0, 212, 255, 0.11);
+  --warn: #ffb02e;
+  --good: #4fe0a0;
+  --mark: rgba(0, 212, 255, 0.28);
+  --radius: 0px;
+  --shadow: 0 0 0 1px rgba(0, 212, 255, 0.06), 0 10px 30px rgba(0, 0, 0, 0.5);
+  --chamfer: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+}
+
+/* The ambient grid. Rendered by the compositor from two gradients, so it
+   costs nothing per frame - the same rule Sarathi's HUD follows on an 8 GB
+   machine with no GPU. */
+:root[data-theme="hud"] body {
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgba(0, 212, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.04) 1px, transparent 1px);
+  background-size: 46px 46px;
+}
+
+:root[data-theme="hud"] .card,
+:root[data-theme="hud"] .hit,
+:root[data-theme="hud"] .preset,
+:root[data-theme="hud"] .headline,
+:root[data-theme="hud"] .dialog {
+  position: relative;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+:root[data-theme="hud"] .card::before,
+:root[data-theme="hud"] .hit::before,
+:root[data-theme="hud"] .preset::before,
+:root[data-theme="hud"] .headline::before,
+:root[data-theme="hud"] .dialog::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--line);
+  clip-path: var(--chamfer);
+  z-index: -1;
+}
+
+:root[data-theme="hud"] .card::after,
+:root[data-theme="hud"] .hit::after,
+:root[data-theme="hud"] .preset::after,
+:root[data-theme="hud"] .headline::after,
+:root[data-theme="hud"] .dialog::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  background: var(--surface);
+  clip-path: var(--chamfer);
+  z-index: -1;
+}
+
+:root[data-theme="hud"] .headline::after {
+  /* OPAQUE. A translucent fill lets the solid cyan edge layer underneath show
+     straight through it, and the banner renders as a bright cyan block with
+     the headline invisible inside it. The tint has to be baked in. */
+  background: #0a2634;
+}
+:root[data-theme="hud"] .headline::before { background: var(--accent); }
+:root[data-theme="hud"] .preset.on::before { background: var(--accent); }
+:root[data-theme="hud"] .hit:hover::before { background: var(--accent); }
+
+/* Anything that reads as instrumentation gets the monospace and the spacing:
+   counters, dates, file paths, the activity log. Prose stays prose. */
+:root[data-theme="hud"] .nav .count,
+:root[data-theme="hud"] .item-meta,
+:root[data-theme="hud"] .hit-folder,
+:root[data-theme="hud"] .hit-kind,
+:root[data-theme="hud"] .log,
+:root[data-theme="hud"] .chip,
+:root[data-theme="hud"] .scopes {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+}
+
+:root[data-theme="hud"] h1 {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 19px;
+}
+
+:root[data-theme="hud"] h2 { color: var(--accent); }
+
+:root[data-theme="hud"] .side {
+  background: rgba(4, 18, 28, 0.85);
+  border-right: 1px solid var(--line);
+}
+
+:root[data-theme="hud"] .nav.on {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+:root[data-theme="hud"] .btn {
+  border-radius: 0;
+  border-color: var(--line);
+  background: transparent;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 12px;
+}
+:root[data-theme="hud"] .btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #04121c;
+}
+:root[data-theme="hud"] .btn:hover { box-shadow: 0 0 12px rgba(0, 212, 255, 0.25); }
+
+:root[data-theme="hud"] .searchbar,
+:root[data-theme="hud"] .text,
+:root[data-theme="hud"] textarea,
+:root[data-theme="hud"] input.text {
+  border-radius: 0;
+  border-color: var(--line);
+  background: rgba(10, 30, 43, 0.7);
+}
+
+:root[data-theme="hud"] .tag { background: rgba(0, 212, 255, 0.12); color: var(--accent); }
+:root[data-theme="hud"] .tag.warn { background: rgba(255, 176, 46, 0.14); color: var(--warn); }
+:root[data-theme="hud"] .brand { color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; }
+:root[data-theme="hud"] .bar > div { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
