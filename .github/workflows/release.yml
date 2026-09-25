@@ -1,0 +1,93 @@
+name: release
+
+# Tag a version and this produces something a non-technical person can
+# download and double-click. That audience is the reason the project exists,
+# and `pip install` excludes them completely.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: cairn-windows.exe
+            built: dist/cairn.exe
+          - os: macos-latest
+            artifact: cairn-macos
+            built: dist/cairn
+          - os: ubuntu-latest
+            artifact: cairn-linux
+            built: dist/cairn
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        # Everything is bundled, so a downloaded build never fails halfway
+        # with a message about a missing optional extra.
+        run: |
+          pip install -e ".[docs,ai,google]"
+          pip install pyinstaller
+
+      - name: Test before shipping
+        run: |
+          pip install pytest
+          pytest -q
+
+      - name: Build
+        run: pyinstaller packaging/cairn.spec --noconfirm
+
+      - name: Check it actually runs
+        # A build that produces a file which cannot start is worse than no
+        # build at all: it reaches users before anyone notices.
+        run: ${{ matrix.built }} stats
+
+      - name: Name it for the platform
+        shell: bash
+        run: mv "${{ matrix.built }}" "${{ matrix.artifact }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: cairn-*
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            Download the file for your system, then run it. Nothing else to install.
+
+            | | |
+            |---|---|
+            | **Windows** | `cairn-windows.exe` — double-click it. Windows will warn that the publisher is unknown, because the build is not code-signed; choose **More info → Run anyway**. |
+            | **macOS** | `cairn-macos` — `chmod +x cairn-macos && ./cairn-macos`. Gatekeeper will object to an unsigned binary; allow it under System Settings → Privacy & Security. |
+            | **Linux** | `cairn-linux` — `chmod +x cairn-linux && ./cairn-linux` |
+
+            Cairn opens in your browser and asks what you want it to do. It can
+            read nothing, open nothing and send nothing until you say so.
+
+            Prefer pip? `pip install "cairn-desk[docs]"`

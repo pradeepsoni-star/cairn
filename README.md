@@ -57,6 +57,20 @@ Each of these is a feature you switch on. A feature that is off has no button **
 
 ## Install
 
+**No Python, nothing to set up** — download the file for your system from the
+[latest release](https://github.com/pradeepsoni-hq/cairn/releases/latest) and run it:
+
+| | |
+|---|---|
+| **Windows** | `cairn-windows.exe` — double-click. Windows warns that the publisher is unknown (the build is not code-signed); choose **More info → Run anyway**. |
+| **macOS** | `chmod +x cairn-macos && ./cairn-macos` |
+| **Linux** | `chmod +x cairn-linux && ./cairn-linux` |
+
+Cairn opens in your browser and asks what you want it to do. It can read
+nothing, open nothing and send nothing until you say so.
+
+**With Python**, if you would rather:
+
 ```bash
 pip install "cairn-desk[docs]"
 cairn

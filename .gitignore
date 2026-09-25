@@ -16,3 +16,5 @@ htmlcov/
 Thumbs.db
 .idea/
 .vscode/
+cairn.spec.bak
+*.crash.txt
