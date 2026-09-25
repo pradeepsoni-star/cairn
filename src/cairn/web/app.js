@@ -732,6 +732,21 @@ async function viewFolders() {
     toast("Saved");
   };
 
+  // First run: they have granted permission and chosen a folder, and the index
+  // is empty. Making them hunt for "Read them now" at that point produces the
+  // worst possible first impression - an app that appears to do nothing. Start
+  // it for them, once.
+  const firstScanDue = allowed && settings.folders.length && !data.stats.files && !running;
+  if (firstScanDue && !state.startedFirstScan) {
+    state.startedFirstScan = true;
+    try {
+      await api("/api/index/start", { method: "POST", body: JSON.stringify({}) });
+      toast("Reading your folders - you can search while it works");
+      pollIndex();
+      return;
+    } catch (error) { toast(error.message); }
+  }
+
   if (running) pollIndex();
 }
 

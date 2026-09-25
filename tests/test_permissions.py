@@ -243,3 +243,74 @@ def test_asking_only_for_search_does_not_hand_you_a_to_do_list(conn, docs, grant
     assert result.added > 0, "search itself must still work"
     assert result.commitments == 0
     assert conn.execute("SELECT COUNT(*) AS n FROM commitments").fetchone()["n"] == 0
+
+
+# ------------------------------------------- the background sweep obeys it too
+
+
+def test_the_background_sweep_does_nothing_without_the_permission(monkeypatch):
+    """`watch_changes` was asked for in three of four presets and used nowhere.
+
+    A permission you request and never exercise is the exact dishonesty this
+    layer exists to prevent, so the behaviour now exists - and it has to obey
+    the same switch as everything else.
+    """
+    import threading
+
+    from cairn import server
+
+    ran = []
+    monkeypatch.setattr(server, "_run_index", lambda full: ran.append(full))
+    monkeypatch.setattr(server, "FIRST_RESCAN_AFTER_SECONDS", 0)
+    monkeypatch.setattr(server, "RESCAN_EVERY_SECONDS", 0.05)
+
+    permissions = Permissions.load()
+    permissions.decide(Permission.READ_FOLDERS, True)
+    # watch_changes deliberately NOT granted
+
+    stop = threading.Event()
+    worker = threading.Thread(target=server._keep_index_fresh, args=(stop,), daemon=True)
+    worker.start()
+    stop.wait(0.3)
+    stop.set()
+    worker.join(timeout=2)
+
+    assert ran == [], "it swept without being allowed to"
+
+
+def test_revoking_mid_run_stops_the_next_background_sweep(monkeypatch, tmp_path):
+    """Checked on every pass, not once at startup: revoke at 11:04 and the
+    11:30 sweep must not happen."""
+    import threading
+
+    from cairn import server
+
+    folder = tmp_path / "work"
+    folder.mkdir()
+    (folder / "a.txt").write_text("something", encoding="utf-8")
+    settings = Settings(folders=[str(folder)], features=["search"], setup_complete=True)
+    settings.save()
+
+    ran = []
+    monkeypatch.setattr(server, "_run_index", lambda full: ran.append(full))
+    monkeypatch.setattr(server, "FIRST_RESCAN_AFTER_SECONDS", 0)
+    monkeypatch.setattr(server, "RESCAN_EVERY_SECONDS", 0.05)
+
+    permissions = Permissions.load()
+    permissions.decide(Permission.READ_FOLDERS, True)
+    permissions.decide(Permission.WATCH_CHANGES, True)
+
+    stop = threading.Event()
+    worker = threading.Thread(target=server._keep_index_fresh, args=(stop,), daemon=True)
+    worker.start()
+    stop.wait(0.25)
+    assert ran, "it should have swept while allowed"
+
+    permissions.decide(Permission.WATCH_CHANGES, False)
+    server._index_state["running"] = False
+    swept_by_then = len(ran)
+    stop.wait(0.3)
+    stop.set()
+    worker.join(timeout=2)
+
+    assert len(ran) == swept_by_then, "it kept sweeping after the permission was revoked"

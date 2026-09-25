@@ -488,6 +488,44 @@ def ask(payload: dict = Body(...), x_cairn_token: str | None = Header(None)) -> 
 # --------------------------------------------------------------------- run
 
 
+# How often the background sweep looks for changed files. Incremental scans of
+# a folder that has not changed cost a second or two, so this can be frequent
+# without being felt. The first one waits, because someone who has just opened
+# Cairn for the first time is still choosing folders.
+RESCAN_EVERY_SECONDS = 30 * 60
+FIRST_RESCAN_AFTER_SECONDS = 5 * 60
+
+
+def _keep_index_fresh(stop: threading.Event) -> None:
+    """Re-read changed files on a timer, for as long as Cairn is open.
+
+    This exists because `watch_changes` was a permission Cairn asked for in
+    three of its four setup presets and then never used. Asking for something
+    you do not use is exactly what the consent layer is supposed to prevent,
+    so either the permission had to go or the behaviour had to arrive.
+
+    It is checked on EVERY pass, not once at startup: someone who revokes it
+    at 11:04 must not get another sweep at 11:30.
+    """
+    if stop.wait(FIRST_RESCAN_AFTER_SECONDS):
+        return
+    while not stop.is_set():
+        try:
+            permissions = Permissions.load()
+            wanted = permissions.allowed(Permission.WATCH_CHANGES) and permissions.allowed(
+                Permission.READ_FOLDERS
+            )
+            if wanted and not _index_state["running"] and Settings.load().folder_paths():
+                _index_state.update({"running": True, "stop": False, "progress": None})
+                _run_index(False)
+        except Exception:
+            # A background thread that dies takes the feature with it silently.
+            # Whatever went wrong, try again at the next interval.
+            _index_state["running"] = False
+        if stop.wait(RESCAN_EVERY_SECONDS):
+            return
+
+
 def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True) -> None:
     import uvicorn
 
@@ -505,4 +543,9 @@ def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True) 
 
         threading.Thread(target=launch, daemon=True).start()
 
-    uvicorn.run(app, host=host, port=port, log_level="warning")
+    stop = threading.Event()
+    threading.Thread(target=_keep_index_fresh, args=(stop,), daemon=True).start()
+    try:
+        uvicorn.run(app, host=host, port=port, log_level="warning")
+    finally:
+        stop.set()
