@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cairn</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>&#128204;</text></svg>">
+</head>
+<body>
+<script>window.CAIRN_TOKEN = "__CAIRN_TOKEN__";</script>
+
+<div class="shell">
+  <nav class="side">
+    <div class="brand">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <ellipse cx="12" cy="19" rx="6" ry="2.4"/>
+        <ellipse cx="12" cy="13.5" rx="4.6" ry="2"/>
+        <ellipse cx="12" cy="8.5" rx="3.2" ry="1.7"/>
+        <ellipse cx="12" cy="4.5" rx="2" ry="1.2"/>
+      </svg>
+      Cairn
+    </div>
+
+    <button class="nav on" data-view="today">Today <span class="count" id="c-today"></span></button>
+    <button class="nav" data-view="search">Search</button>
+    <button class="nav" data-view="todo">Commitments <span class="count" id="c-todo"></span></button>
+    <button class="nav" data-view="notes">Notes <span class="count" id="c-notes"></span></button>
+    <button class="nav" data-view="ask">Ask</button>
+    <button class="nav" data-view="setup">Folders <span class="count" id="c-files"></span></button>
+
+    <div class="side-foot">
+      <div id="foot-status">not indexed yet</div>
+      <div style="margin-top:8px"><button class="btn sm" id="theme-toggle">theme</button></div>
+    </div>
+  </nav>
+
+  <main class="main" id="main"></main>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/app.js"></script>
+</body>
+</html>
