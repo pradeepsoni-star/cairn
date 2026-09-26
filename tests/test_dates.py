@@ -117,3 +117,28 @@ def test_a_decimal_is_not_a_date(text):
 )
 def test_humanise(due, expected):
     assert humanise(due, TODAY) == expected
+
+
+@pytest.mark.parametrize("offset", range(7))
+def test_next_weekday_is_right_on_every_day_of_the_week(offset):
+    """The arithmetic version broke at the end of the week, and broke silently.
+
+    "next Friday" used to be computed as "the next Friday, plus seven days".
+    Said on a Saturday the coming Friday is ALREADY next week, so that landed
+    two Fridays out - a whole week late, on exactly the kind of promise people
+    make on a Friday afternoon about the following week.
+
+    It now means that weekday in the following calendar week, counted from
+    next Monday, which is what people mean whichever day they say it.
+    """
+    from datetime import timedelta
+
+    said_on = date(2026, 9, 21) + timedelta(days=offset)   # Mon 21 .. Sun 27 Sep
+    assert parse_due("next Friday", said_on) == date(2026, 10, 2)
+    assert parse_due("next Monday", said_on) == date(2026, 9, 28)
+
+
+def test_a_bare_weekday_still_means_the_coming_one():
+    """Only "next" changed. "Friday" keeps meaning the next Friday there is."""
+    assert parse_due("Friday", date(2026, 9, 23)) == date(2026, 9, 25)   # Wednesday
+    assert parse_due("Friday", date(2026, 9, 26)) == date(2026, 10, 2)   # Saturday

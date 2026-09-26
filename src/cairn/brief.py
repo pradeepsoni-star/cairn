@@ -62,6 +62,8 @@ def build(conn, today: date | None = None, changed_days: int = 3) -> dict:
     today = today or date.today()
     mine = commitments.open_items(conn, who="me", limit=300)
     theirs = commitments.open_items(conn, who="them", limit=100)
+    # Counted, not measured off the capped list above.
+    waiting_total = commitments.count_open(conn, who="them")
     buckets = _bucket(mine, today)
 
     counts = db_stats(conn)
@@ -79,8 +81,8 @@ def build(conn, today: date | None = None, changed_days: int = 3) -> dict:
     elif buckets["today"]:
         number = len(buckets["today"])
         headline = "One thing is due today." if number == 1 else f"{number} things are due today."
-    elif theirs:
-        headline = f"Nothing due today. You are waiting on {_count(len(theirs), 'thing')}."
+    elif waiting_total:
+        headline = f"Nothing due today. You are waiting on {_count(waiting_total, 'thing')}."
     elif buckets["soon"]:
         headline = f"Nothing due today. {_count(len(buckets['soon']), 'thing')} this week."
     elif counts["files"] == 0:
@@ -97,6 +99,7 @@ def build(conn, today: date | None = None, changed_days: int = 3) -> dict:
         "due_later": buckets["later"],
         "undated": buckets["undated"][:10],
         "waiting_on": theirs,
+        "waiting_on_total": waiting_total,
         "changed_files": changed,
         "stats": counts,
     }

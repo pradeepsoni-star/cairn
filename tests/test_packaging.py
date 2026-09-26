@@ -46,3 +46,55 @@ def test_the_page_still_carries_its_token_placeholder():
     from cairn.server import WEB_DIR
 
     assert "__CAIRN_TOKEN__" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
+
+
+def test_it_prefers_a_real_window_over_a_browser_tab(monkeypatch):
+    """Someone who double-clicks a program and lands in a browser tab, beside
+    their email and twelve other tabs, has been told it is a web page rather
+    than a thing they installed."""
+    from cairn import server
+
+    launched = {}
+
+    def fake_popen(command, **kwargs):
+        launched["command"] = command
+        return object()
+
+    monkeypatch.setattr(server, "_app_mode_browsers", lambda: [["/fake/chrome"]])
+    monkeypatch.setattr(server.subprocess, "Popen", fake_popen)
+
+    assert server.open_as_app("http://127.0.0.1:8765/") == "app window"
+    assert "--app=http://127.0.0.1:8765/" in launched["command"]
+
+
+def test_it_still_opens_when_no_chromium_browser_exists(monkeypatch):
+    """A machine with only Firefox, or a locked-down build with the flag
+    disabled, must still end up looking at Cairn rather than at nothing."""
+    import webbrowser
+
+    from cairn import server
+
+    opened = {}
+    monkeypatch.setattr(server, "_app_mode_browsers", lambda: [])
+    monkeypatch.setattr(webbrowser, "open", lambda url: opened.setdefault("url", url) or True)
+
+    assert server.open_as_app("http://127.0.0.1:8765/") == "browser tab"
+    assert opened["url"] == "http://127.0.0.1:8765/"
+
+
+def test_a_browser_that_refuses_to_start_falls_through_to_the_next(monkeypatch):
+    from cairn import server
+
+    tried = []
+
+    def fussy(command, **kwargs):
+        tried.append(command[0])
+        if command[0] == "/broken":
+            raise OSError("no such file")
+        return object()
+
+    monkeypatch.setattr(server, "_app_mode_browsers", lambda: [["/broken"], ["/works"]])
+    monkeypatch.setattr(server.subprocess, "Popen", fussy)
+
+    assert server.open_as_app("http://x/") == "app window"
+    assert tried == ["/broken", "/works"]

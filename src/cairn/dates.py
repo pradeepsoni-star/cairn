@@ -157,12 +157,19 @@ def parse_due(text: str, today: date | None = None, day_first: bool = True) -> d
     weekday = re.search(rf"\b(next|this|coming)?\s*({'|'.join(WEEKDAYS)})\b", lowered)
     if weekday:
         target = WEEKDAYS[weekday.group(2)]
-        found = _next_weekday(today, target)
-        if (weekday.group(1) or "").strip() == "next" and (target - today.weekday()) % 7 != 0:
-            # "next Friday" said on a Monday means the Friday of next week,
-            # not this one - the commonest source of a missed handover.
-            found += timedelta(days=7)
-        return found
+        if (weekday.group(1) or "").strip() == "next":
+            # "next Friday" means that weekday in the following CALENDAR week,
+            # counted from next Monday - not "the next Friday, plus seven".
+            #
+            # The arithmetic version breaks at the end of the week, and breaks
+            # silently. Said on a Saturday, the coming Friday is already in
+            # next week, so adding a further seven days lands two Fridays out.
+            # Measured on a Saturday it returned the 9th for a date the writer
+            # meant as the 2nd - a whole week late, on the kind of promise
+            # people make on a Friday afternoon about the following week.
+            next_monday = today + timedelta(days=7 - today.weekday())
+            return next_monday + timedelta(days=target)
+        return _next_weekday(today, target)
 
     if re.search(r"\bnext week\b", lowered):
         return _next_weekday(today, 0)

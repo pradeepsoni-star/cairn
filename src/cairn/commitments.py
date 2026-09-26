@@ -245,6 +245,19 @@ def open_items(conn, who: str = "", limit: int = 200) -> list[dict]:
     return [dict(row) for row in conn.execute(query, params)]
 
 
+def count_open(conn, who: str = "") -> int:
+    """How many are actually open - not how many a page of them holds.
+
+    The brief once announced "you are waiting on 100 things" because its list
+    was capped at 100 and the headline counted the list. A number that is
+    really a page size, stated as a fact, is worse than no number.
+    """
+    query = "SELECT COUNT(*) AS n FROM commitments WHERE status = 'open'" + (
+        " AND who = ?" if who else ""
+    )
+    return conn.execute(query, (who,) if who else ()).fetchone()["n"]
+
+
 def complete(conn, item_id: int, done: bool = True) -> None:
     import time
 

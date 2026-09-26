@@ -84,6 +84,64 @@ def feature_on(key: str) -> None:
         )
 
 
+def _app_mode_browsers() -> list[list[str]]:
+    """Commands that open a URL in a plain window with no browser furniture.
+
+    Chromium's `--app=` flag gives a window with no address bar, no tabs and
+    no bookmarks - its own entry in the taskbar, and to anyone looking at it,
+    an application. The page is identical; only the frame around it changes.
+
+    This matters more than it sounds. Someone who double-clicks a program and
+    lands in a browser tab, beside their email and twelve other tabs, has been
+    told it is a web page rather than a thing they installed - and the first
+    impression is the one that decides whether they open it again tomorrow.
+    """
+    if sys.platform == "win32":
+        program_files = [
+            os.environ.get("PROGRAMFILES", r"C:\Program Files"),
+            os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
+            os.environ.get("LOCALAPPDATA", ""),
+        ]
+        candidates = []
+        for base in filter(None, program_files):
+            candidates += [
+                Path(base) / "Microsoft" / "Edge" / "Application" / "msedge.exe",
+                Path(base) / "Google" / "Chrome" / "Application" / "chrome.exe",
+            ]
+        return [[str(c)] for c in candidates if c.exists()]
+
+    if sys.platform == "darwin":
+        return [
+            ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"],
+            ["/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"],
+        ]
+
+    return [[name] for name in ("google-chrome", "chromium", "chromium-browser", "microsoft-edge")]
+
+
+def open_as_app(url: str) -> str:
+    """Show Cairn in its own window, or fall back to an ordinary tab.
+
+    Falling back matters: a machine with only Firefox, or a locked-down build
+    with the flag disabled, must still end up looking at Cairn rather than at
+    nothing. Returns what actually happened, so the caller can say so.
+    """
+    for command in _app_mode_browsers():
+        try:
+            subprocess.Popen(
+                [*command, f"--app={url}", "--window-size=1200,860"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return "app window"
+        except (OSError, subprocess.SubprocessError):
+            continue
+
+    import webbrowser
+
+    return "browser tab" if webbrowser.open(url) else "nothing"
+
+
 # ----------------------------------------------------------------- the page
 
 # The interface is served with caching switched off. These files change when
@@ -616,10 +674,8 @@ def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True) 
 
     if open_browser:
         def launch() -> None:
-            import webbrowser
-
             time.sleep(1.0)
-            webbrowser.open(f"http://{host}:{port}/")
+            open_as_app(f"http://{host}:{port}/")
 
         threading.Thread(target=launch, daemon=True).start()
 

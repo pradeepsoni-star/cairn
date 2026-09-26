@@ -189,3 +189,21 @@ def test_an_unknown_permission_name_is_rejected(isolated_home):
     from cairn.cli import main
 
     assert main(["permissions", "--allow", "read_everything"]) == 1
+
+
+def test_the_brief_counts_what_is_open_not_what_fits_on_the_page(api_client):
+    """It once announced "you are waiting on 100 things" because its list was
+    capped at 100. A page size stated as a fact is worse than no number."""
+    from cairn import commitments, server
+
+    items = [
+        commitments.Commitment(f"Someone will confirm item {n}", "them", None, "note", f"n:{n}")
+        for n in range(150)
+    ]
+    commitments.store(server.db(), items)
+    server.db().commit()
+
+    brief = api_client.get("/api/brief").json()
+    assert brief["waiting_on_total"] == 150
+    assert len(brief["waiting_on"]) == 100, "the list is still paged"
+    assert "150 things" in brief["headline"], brief["headline"]
