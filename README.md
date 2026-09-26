@@ -10,7 +10,7 @@ Local-first. Nothing is granted by default. Everything it does is written down.
 
 </div>
 
-**[User guide](docs/GUIDE.md)** · **[Download](https://github.com/pradeepsoni-star/cairn/releases/latest)**
+**[User guide](docs/GUIDE.md)** · **[Download](https://github.com/pradeepsoni-star/cairn/releases/latest)** · **[Code signing policy](docs/CODE_SIGNING_POLICY.md)**
 
 ---
 
@@ -227,6 +227,14 @@ ruff check .
 ## Contributing
 
 Issues and pull requests welcome. The bar for a new dependency is high — this is a tool people install on a work machine.
+
+## Code signing
+
+Free code signing provided by [SignPath.io](https://about.signpath.io),
+certificate by [SignPath Foundation](https://signpath.org).
+
+See the [code signing policy](docs/CODE_SIGNING_POLICY.md) for who approves a
+release, what gets signed, and what Cairn does and does not transmit.
 
 ## Licence
 

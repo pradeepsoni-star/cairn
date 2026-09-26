@@ -100,6 +100,10 @@ jobs:
 
             Prefer pip? `pip install "cairn-desk[docs]"`
 
+            Free code signing provided by [SignPath.io](https://about.signpath.io),
+            certificate by [SignPath Foundation](https://signpath.org).
+            See the [code signing policy](https://github.com/pradeepsoni-star/cairn/blob/main/docs/CODE_SIGNING_POLICY.md).
+
             ---
 
             **Verifying your download.** These builds are not code-signed yet
