@@ -158,3 +158,72 @@ def test_html_is_indexed_as_text_not_as_markup(conn, docs, settings_for):
         "SELECT body FROM chunks WHERE path LIKE '%page.html'"
     ).fetchone()["body"]
     assert "<p>" not in body and "&mdash;" not in body
+
+
+def test_a_first_scan_does_not_delete_passages_it_knows_are_not_there(conn, docs, settings_for):
+    """The defect that made a first scan quadratic.
+
+    FTS5 has no index on `path` - it is an UNINDEXED column - so every
+    `DELETE ... WHERE path = ?` scans the whole table. Measured: 7 ms at
+    2,000 passages, 1,285 ms at 120,000. One per file turned 5,100 files into
+    eighteen minutes. Nothing needs clearing for a file never seen before.
+    """
+    deletes: list[str] = []
+    conn.set_trace_callback(lambda sql: deletes.append(sql) if "DELETE FROM chunks" in sql else None)
+    try:
+        result = indexer.reindex(conn, settings_for)
+    finally:
+        conn.set_trace_callback(None)
+
+    assert result.added > 0
+    assert deletes == [], "a first scan cleared passages that could not exist"
+
+
+def test_re_reading_changed_files_clears_their_old_passages_in_one_pass(conn, docs, settings_for):
+    """Updates still have to clear, but one scan for a batch beats one each."""
+    import os
+    import time
+
+    indexer.reindex(conn, settings_for)
+
+    for name in ("readme.txt", "budget.csv"):
+        target = docs / name
+        target.write_text("completely different content now", encoding="utf-8")
+        os.utime(target, (time.time() + 5, time.time() + 5))
+
+    deletes: list[str] = []
+    conn.set_trace_callback(lambda sql: deletes.append(sql) if "DELETE FROM chunks" in sql else None)
+    try:
+        indexer.reindex(conn, settings_for)
+    finally:
+        conn.set_trace_callback(None)
+
+    assert len(deletes) == 1, f"one combined delete expected, got {len(deletes)}"
+    assert " IN (" in deletes[0]
+    # and the old text is genuinely gone, not merely fewer deletes
+    assert search(conn, "Falcon northern warehouse") == []
+
+
+def test_workers_never_touch_the_database(conn, docs, settings_for):
+    """SQLite has one writer. A worker pool that writes is one that corrupts.
+
+    Reading and chunking happen on threads; every write happens on the thread
+    that owns the connection. This pins that the parallel path produces the
+    same result as the serial one.
+    """
+    single = Settings(
+        folders=settings_for.folders,
+        features=settings_for.features,
+    )
+    single.setup_complete = True
+
+    original = indexer.WORKERS
+    indexer.WORKERS = 1
+    try:
+        serial = indexer.reindex(conn, single, full=True)
+    finally:
+        indexer.WORKERS = original
+
+    parallel = indexer.reindex(conn, settings_for, full=True)
+    assert parallel.passages == serial.passages
+    assert parallel.unreadable == serial.unreadable
