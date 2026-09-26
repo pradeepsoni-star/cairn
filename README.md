@@ -238,4 +238,15 @@ release, what gets signed, and what Cairn does and does not transmit.
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+**AGPL-3.0-or-later.** See [LICENSE](LICENSE).
+
+In plain terms: use it for anything, including commercially, and modify it
+freely. If you distribute a modified version - or run one as a service other
+people use - you have to publish your changes under the same licence.
+
+Versions up to v0.1.2 were MIT. That grant cannot be withdrawn for those
+versions; this applies from v0.2.0 onward.
+
+Contributions are welcome and are accepted under the same licence. If that
+ever needs to change, it will need every contributor's agreement, so the
+project asks contributors to say so explicitly in their first pull request.

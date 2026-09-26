@@ -22,17 +22,22 @@ paying purely to skip SmartScreen no longer buys what it used to.
 
 | Requirement | Cairn |
 |---|---|
-| OSI-approved licence, no commercial dual-licensing | ✅ MIT |
+| OSI-approved licence, no commercial dual-licensing | ✅ AGPL-3.0-or-later |
 | No proprietary or closed components | ✅ every dependency is open source |
 | Publicly accessible repository | ✅ |
 | Releases built from CI | ✅ `.github/workflows/release.yml` builds all three platforms |
 | Actively maintained | ✅ |
-| Already released in the form to be signed | ✅ v0.1.0 and v0.1.1 published |
+| Already released in the form to be signed | ✅ releases published for all three platforms |
 | Functionality described on the download page | ✅ README and the release notes |
 | No malware or unwanted behaviour | ✅ — and the permission model plus the activity log make this checkable rather than assertable |
-| **2FA on the GitHub account** | ⚠️ **check this before applying** |
+| 2FA on the GitHub account | ✅ enabled 26 Sep 2026 |
 
-The only item needing action is the last one.
+Every criterion is met. What is **not** yet met is the application form's
+required "Reputation" field: at the time of writing the project is days old
+with no stars, no coverage and a handful of downloads, all of them the
+author's own testing. Applying with nothing to point at invites a refusal
+that makes a later, stronger application harder, so this waits until there
+are real users to describe.
 
 ## Applying
 
