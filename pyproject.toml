@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cairn-desk"
-version = "0.2.0"
+version = "0.2.1"
 description = "Find anything on your computer, and never lose a commitment again. Local-first, offline, no account."
 readme = "README.md"
 requires-python = ">=3.10"
