@@ -72,9 +72,17 @@ jobs:
         with:
           merge-multiple: true
 
+      - name: Checksums
+        # Until the build is signed, this is the only way a cautious person can
+        # confirm the file they downloaded is the file that was built. Weaker
+        # than a signature - it says nothing about WHO built it - but free.
+        run: sha256sum cairn-* | tee SHA256SUMS.txt
+
       - uses: softprops/action-gh-release@v2
         with:
-          files: cairn-*
+          files: |
+            cairn-*
+            SHA256SUMS.txt
           generate_release_notes: true
           body: |
             ## Install
@@ -91,3 +99,14 @@ jobs:
             read nothing, open nothing and send nothing until you say so.
 
             Prefer pip? `pip install "cairn-desk[docs]"`
+
+            ---
+
+            **Verifying your download.** These builds are not code-signed yet
+            ([why, and the plan](docs/SIGNING.md)), so Windows and macOS will
+            warn about an unknown publisher. `SHA256SUMS.txt` below lets you
+            confirm the file is the one this workflow built:
+
+            ```powershell
+            Get-FileHash .\cairn-windows.exe -Algorithm SHA256
+            ```
