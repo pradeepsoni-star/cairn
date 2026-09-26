@@ -1,0 +1,29 @@
+Cairn - find anything on your computer, and never lose a commitment again.
+
+Copyright (C) 2026 Pradeep Soni
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+----------------------------------------------------------------------
+
+Versions up to and including v0.1.2 were released under the MIT licence.
+That grant is irrevocable for those versions; the AGPL applies from v0.2.0
+onward.
+
+The LICENSE file alongside this one is the unmodified text of the GNU Affero
+General Public License version 3. It is kept verbatim on purpose: GitHub and
+other tools identify a licence by matching that file against known licence
+texts, and a preamble added to it makes the project report as "Other" rather
+than as AGPL-3.0 - which is exactly the confusion this project should not
+create. Project-specific notices belong here instead.

@@ -238,7 +238,9 @@ release, what gets signed, and what Cairn does and does not transmit.
 
 ## Licence
 
-**AGPL-3.0-or-later.** See [LICENSE](LICENSE).
+**AGPL-3.0-or-later.** See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+Copyright (C) 2026 Pradeep Soni.
 
 In plain terms: use it for anything, including commercially, and modify it
 freely. If you distribute a modified version - or run one as a service other
